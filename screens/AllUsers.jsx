@@ -1,34 +1,57 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
     View, Text, TextInput, ScrollView,
     TouchableOpacity, StyleSheet, Alert
 } from 'react-native';
+import { useTheme } from '../context/ThemeContext';
 
 const API = 'http://10.7.30.107:3000';
 const AUTH = 'Basic Ayushmaan:54321';
 
-export default function AllUsers() {
+export default function AllUsers({ navigation }) {
+    const { colors } = useTheme();
+    const styles = useMemo(() => createStyles(colors), [colors]);
     const [users, setUsers] = useState([]);
+    const [currentUserId, setCurrentUserId] = useState('');
     const [search, setSearch] = useState('');
     const [selected, setSelected] = useState([]);
     const [type, setType] = useState('DM');
     const [groupName, setGroupName] = useState('');
 
     useEffect(() => {
-        fetch(`${API}/user`, { headers: { Authorization: AUTH } })
-            .then(res => {
-                if (!res.ok) throw new Error('Failed to load users');
-                return res.json();
-            })
-            .then(setUsers)
-            .catch(err => Alert.alert('Error', err.message));
+        const loadUsers = async () => {
+            try {
+                const [usersRes, profileRes] = await Promise.all([
+                    fetch(`${API}/user`, { headers: { Authorization: AUTH } }),
+                    fetch(`${API}/user/profile`, { headers: { Authorization: AUTH } })
+                ]);
+                if (!usersRes.ok || !profileRes.ok) {
+                    throw new Error('Failed to load users or current profile');
+                }
+
+                const [allUsers, profile] = await Promise.all([
+                    usersRes.json(),
+                    profileRes.json()
+                ]);
+                setUsers(allUsers);
+                setCurrentUserId(profile.id);
+            } catch (err) {
+                Alert.alert('Error', err.message);
+            }
+        };
+
+        loadUsers();
     }, []);
 
     const toggleUser = id => {
+    if (type === 'DM') {
+        setSelected(old => old.includes(id) ? [] : [id]);
+    } else {
         setSelected(old =>
             old.includes(id) ? old.filter(x => x !== id) : [...old, id]
         );
+    }
     };
 
     const createConversation = async () => {
@@ -59,14 +82,18 @@ export default function AllUsers() {
             const data = await res.json();
             setSelected([]);
             setGroupName('');
-            Alert.alert('Success', `${data.name} created successfully`);
+
+            navigation.navigate('Conversations', {
+                refresh: Date.now(),
+                conversationId: data.id
+            });
         } catch (err) {
             Alert.alert('Error', err.message);
         }
     };
 
     const filteredUsers = users.filter(user =>
-        user.name !== 'Ayushmaan' &&
+        user.id !== currentUserId &&
         user.name.toLowerCase().includes(search.toLowerCase())
     );
 
@@ -77,6 +104,7 @@ export default function AllUsers() {
             <TextInput
                 style={styles.search}
                 placeholder="Search contacts..."
+                placeholderTextColor={colors.muted}
                 value={search}
                 onChangeText={setSearch}
             />
@@ -86,9 +114,12 @@ export default function AllUsers() {
                     <TouchableOpacity
                         key={value}
                         style={[styles.tab, type === value && styles.active]}
-                        onPress={() => setType(value)}
+                        onPress={() => {
+                        setType(value);
+                        setSelected([]);
+                    }}
                     >
-                        <Text style={{ color: type === value ? 'white' : '#555' }}>
+                        <Text style={type === value ? styles.activeTabText : styles.tabText}>
                             {value === 'DM' ? 'Personal chat' : 'Group chat'}
                         </Text>
                     </TouchableOpacity>
@@ -99,6 +130,7 @@ export default function AllUsers() {
                 <TextInput
                     style={styles.search}
                     placeholder="Group name"
+                    placeholderTextColor={colors.muted}
                     value={groupName}
                     onChangeText={setGroupName}
                 />
@@ -152,41 +184,44 @@ export default function AllUsers() {
     );
 }
 
-const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: 'white' },
-    title: { fontSize: 26, fontWeight: 'bold', margin: 18 },
+const createStyles = colors => StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    title: { fontSize: 26, fontWeight: 'bold', margin: 18, color: colors.text },
     search: {
-        backgroundColor: '#F2F2F2', marginHorizontal: 16,
+        backgroundColor: colors.surfaceAlt, color: colors.text, marginHorizontal: 16,
         marginBottom: 12, padding: 12, borderRadius: 10
     },
     tabs: {
         flexDirection: 'row', marginHorizontal: 16,
-        backgroundColor: '#F2F2F2', borderRadius: 10, padding: 4
+        backgroundColor: colors.surfaceAlt, borderRadius: 10, padding: 4
     },
     tab: { flex: 1, alignItems: 'center', padding: 11, borderRadius: 8 },
-    active: { backgroundColor: '#168C4A' },
+    active: { backgroundColor: colors.primary },
+    activeTabText: { color: colors.onPrimary },
+    tabText: { color: colors.text },
     section: {
-        color: '#168C4A', fontWeight: 'bold',
+        color: colors.primary, fontWeight: 'bold',
         margin: 18, marginBottom: 5
     },
     row: {
         flexDirection: 'row', alignItems: 'center',
-        padding: 14, borderBottomWidth: 1, borderColor: '#eee'
+        padding: 14, borderBottomWidth: 1, borderColor: colors.border
     },
     avatar: {
         width: 48, height: 48, borderRadius: 24,
-        backgroundColor: '#D9FDD3', justifyContent: 'center',
+        backgroundColor: colors.avatar, justifyContent: 'center',
         alignItems: 'center', marginRight: 12
     },
-    initial: { color: '#168C4A', fontSize: 19, fontWeight: 'bold' },
-    name: { fontSize: 15, fontWeight: '600' },
-    bio: { color: '#888', marginTop: 4, fontSize: 12 },
-    check: { color: '#168C4A', fontSize: 22 },
-    bottom: { padding: 15, borderTopWidth: 1, borderColor: '#eee' },
-    count: { color: '#888', marginBottom: 10 },
+    initial: { color: colors.primary, fontSize: 19, fontWeight: 'bold' },
+    name: { fontSize: 15, fontWeight: '600', color: colors.text },
+    bio: { color: colors.muted, marginTop: 4, fontSize: 12 },
+    check: { color: colors.primary, fontSize: 22 },
+    bottom: { padding: 15, borderTopWidth: 1, borderColor: colors.border },
+    count: { color: colors.muted, marginBottom: 10 },
     create: {
-        backgroundColor: '#168C4A',
+        backgroundColor: colors.primary,
         padding: 14, borderRadius: 10, alignItems: 'center'
     },
-    createText: { color: 'white', fontWeight: 'bold' }
+    createText: { color: colors.onPrimary, fontWeight: 'bold' },
+    info: { textAlign: 'center', marginTop: 30, color: colors.muted }
 });
