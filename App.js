@@ -7,7 +7,7 @@ import AllUsers from "./screens/AllUsers";
 import StackNavigation from "./screens/Stack";
 import ImagePickerScreen from "./screens/ImagePicker";
 import CameraScreen from "./screens/CameraScreen";
-import RawCameraScreen from "./screens/RawCameraScreen";
+
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 
 const Tab = createBottomTabNavigator();
@@ -51,7 +51,7 @@ function AppNavigation() {
           <Tab.Screen name='AllUsers' component={AllUsers} options={{ headerShown: true }} />
           <Tab.Screen name='ImagePickerScreen' component={ImagePickerScreen} options={{ headerShown: true }} />
           <Tab.Screen name='CameraScreen' component={CameraScreen} options={{ headerShown: false }} />
-          <Tab.Screen name='RawCameraScreen' component={RawCameraScreen} options={{ headerShown: false }} />
+          
         </Tab.Navigator>
       </NavigationContainer>
     </>
